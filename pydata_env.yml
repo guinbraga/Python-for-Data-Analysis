@@ -1,0 +1,23 @@
+name: pydata_book
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pandas
+  - jupyter
+  - matplotlib
+  - lxml
+  - beautifulsoup4
+  - html5lib
+  - openpyxl
+  - requests
+  - sqlalchemy
+  - seaborn
+  - scipy
+  - statsmodels
+  - patsy
+  - scikit-learn
+  - pyarrow
+  - pytables
+  - numba
