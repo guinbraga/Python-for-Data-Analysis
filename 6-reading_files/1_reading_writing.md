@@ -14,7 +14,7 @@ jupyter:
     name: pydata_book
 ---
 
-# Reading and Writing Data in Text Format 
+# 6.1 Reading and Writing Data in Text Format 
 
 There are lots of functions in pandas for reading data in  a 
 text format. These functions also have lots of arguments, as
@@ -31,6 +31,7 @@ As it is a csv, we can use `pandas.read_csv`:
 ```python
 import pandas as pd
 import numpy as np
+from pandas._libs import index
 ```
 
 ```python
@@ -342,3 +343,204 @@ and to the disk. These include:
 **upnext**: dealing with binary formats of data, dealing with web APIs
 and Databases!
     
+# 6.2 Binary Data Formats
+
+Python's built-in way to deal with binary files is the `pickle` format.
+Pandas has ways of reading and writing to pickle, but that is not common 
+practice due to the unstable nature of the pickle format. 
+
+Pandas can also read other binary formats, such as HDF5, ORC, and Apache 
+Parquet. `read_parquet` will be useful when dealing with pyarrow in the 
+future.
+
+## Reading Microsoft Excel Files
+
+Reading XLS and XLSX files with pandas requires the packages `xlrd` and 
+`openpyxl` as dependencies. There are two ways to handle Excel files:
+The `.read_excel()` method and the `pd.ExcelFile` class.
+
+The `ExcelFile` class allows you to access a wide variety of data in the
+file, such as its sheets with `sheet_names`, and turning a sheet into a 
+`DataFrame` with `parse(sheet_name='')`:
+
+```python
+import pandas as pd
+xlsx = pd.ExcelFile('../pydata-book/examples/ex1.xlsx')
+xlsx.sheet_names 
+```
+
+```python
+xlsx.parse(sheet_name='Sheet1')
+```
+
+This table has a index columns which was parsed as an `Unnamed` column.
+We can indicate that with `index_col` argument:
+
+```python
+xlsx.parse(sheet_name='Sheet1', index_col=0 )
+```
+
+If we're dealing with only one sheet of a document, we may wish to 
+load it at once with `.read_excel`:
+
+```python
+frame = pd.read_excel('../pydata-book/examples/ex1.xlsx', sheet_name='Sheet1', index_col=0)
+frame
+```
+
+### Writing to Excel
+
+To write to excel, we first create an `ExcelWriter` object, which takes the 
+output file as a parameter in it's creation. Then, we call `frame.to_excel()`
+passing the writer object as the first parameter and the sheet name.
+
+```python
+writer = pd.ExcelWriter("../pydata-book/examples/ex2.xlsx")
+frame.to_excel(writer, "Sheet1")
+writer.close()
+```
+We can skip the writer by simply passing a file path to `to_excel()`
+
+```python
+frame.to_excel('../pydata-book/examples/ex2.xlsx')
+```
+## Using HDF5 file format
+
+Hierarchical Data Format files are efficient in their memory usage, as
+they are easily compressed. They are a good option to dealing with 
+data that doesn't fit in memory.
+
+To use HDF5 in pandas we need the `PyTables` package. Pandas then provides
+a high-level interface to this library with the `pd.HDFStore` class:
+
+
+```python
+import numpy as np
+frame = pd.DataFrame({'a': np.random.standard_normal(100)})
+store = pd.HDFStore('../pydata-book/examples/mydata.h5')
+store['obj1'] = frame
+store['obj1_col'] = frame['a']
+store
+```
+
+We retrieve the objects stored in the HDF5 file with a dictionary-like API:
+
+```python
+store['obj1_col']
+```
+
+A tool like HDF5 can really speed up the process of analysis with large 
+dataframes.
+
+# 6.3 Interacting with Web APIs
+
+We can retrieve data provided by an API (usually in JSON format) with the
+`requests` package. In the example below we make a GET HTTP request of the
+last 30 GitHub issues for pandas on GitHub:
+
+```python
+import requests
+url = 'https://api.github.com/repos/pandas-dev/pandas/issues'
+resp = requests.get(url)
+resp.raise_for_status()
+resp
+```
+
+It's good practice to call `raise_for_status()` after a get request
+to check for HTTP errors.
+
+The `response` object has a `json()` method to parse the JSON data as 
+a dict or a list:
+
+```python
+data = resp.json()
+
+data[0]['title']
+```
+
+Each element in `data` is a dictionary with the data found on the 
+Issues page, except for the comments. We can pass that data to a 
+pandas DataFrame for data analysis:
+
+```python
+issues = pd.DataFrame(data, columns=['number', 'title', 'labels', 'state'])
+issues
+```
+
+The main idea to takeaway is that we can create interfaces to 
+extract and interact with web APIs to posterior analysis with
+`DataFrames`.
+
+# 6.4 Interacting With Databases
+
+In business, a lot of the times data is stored in a database 
+which we query to interact with. Pandas has a built-in way
+of interacting with such databases, but we'll demonstrate
+the hurdle that is to do it 'manually', too. Consider the
+database created with SQLite below:
+
+```python
+import sqlite3
+query = """
+  CREATE TABLE test
+  (a VARCHAR(20), b VARCHAR(20), c REAL, d INTEGER);
+"""
+con = sqlite3.connect('mydata.sqlite')
+con.execute(query)
+con.commit()
+```
+
+We'll insert a few rows of data:
+
+
+```python
+data = [('Atlanta', 'Georgia', 1.25, 6),
+        ('Tallahassee', 'Florida', 2.6, 3),
+        ('Sacramento', 'California', 1.7, 5)]
+stmt = 'INSERT INTO test VALUES (?, ?, ?, ?)'
+
+con.executemany(stmt, data)
+con.commit() 
+```
+
+Usually a list of tuples is returned from a query
+with a python SQL driver:
+
+```python
+cursor = con.execute('SELECT * FROM test')
+rows = cursor.fetchall()
+rows
+```
+
+We can pass this list of tuples to the DataFrame constructor,
+but we'll need the column names too. For `sqlite3`, this information
+is contained in the cursor's `description` attribute:
+
+```python
+cursor.description
+```
+
+```python
+pd.DataFrame(rows, columns=[row[0] for row in cursor.description])
+```
+
+## The pandas way of retrieving data from databases
+
+To do it the built-in way, we must use an `SQLAlchemy` connection:
+
+```python
+import sqlalchemy as sqla
+
+db = sqla.create_engine('sqlite:///mydata.sqlite')
+
+pd.read_sql('SELECT * FROM test', db)
+```
+
+# Summary
+
+Retrieving data is an important first step in data analysis.
+We've been exposed to various offered by pandas to do it, 
+so that we're able to easily retrieve data from *csv, xml,
+html, web APIs, databases, json, excel, binary file formats*,
+and more. Next, we'll start data wrangling, visualization, 
+time series analysis and more.
