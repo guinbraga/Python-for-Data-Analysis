@@ -313,3 +313,240 @@ to rename specific values to specific replacements:
 ```python
 data.rename(index={'OHIO': 'Indiana'}, columns={'three': 'peekaboo'})
 ```
+
+### Discretization and Binning
+
+We can organize continuous data into discrete
+groups (or bins) for analysis. Suppose this data
+to be categorized in different bins:
+
+```python
+ages = [20, 22, 25, 27, 21, 23, 37, 31, 61, 45, 41, 32]
+```
+
+To divide it into bins, we first determine the
+limits of our bins and then use `pd.cut` with
+our data and bins as parameters:
+
+```python
+bins = [18, 25, 35, 60, 100]
+
+age_categories = pd.cut(ages, bins)
+
+age_categories
+```
+
+This is a special Categorical object. Each bin
+is identified by this special pandas interval value
+containing upper and lower limits. Let's explore this 
+object:
+
+```python
+age_categories.codes
+```
+
+```python
+age_categories.categories
+```
+
+```python
+age_categories.categories[0]
+```
+
+```python
+age_categories.value_counts()
+```
+
+Here, the interval openness is indicated by the
+parenthesis and brackets. The parenthesis means the
+interval is open (exclusive) and the bracket means 
+closed (inclusive). We can change the side that's
+inclusive with the `right=False` parameter:
+
+```python
+pd.cut(ages, bins, right=False).value_counts()
+```
+
+We may with to use other names for labels instead
+of the interval-based ones with the `labels` parameter:
+
+```python
+age_groups = ['Youth', 'YoungAdult', 'MiddleAged', 'Senior']
+pd.cut(ages, bins, labels=age_groups)
+```
+
+If we pass an integer as the bins argument, pandas
+will automatically create equally spaced intervals
+to bin our data based on the maximum and minimum 
+values:
+
+```python
+data = np.random.uniform(size=20)
+pd.cut(data, 4, precision=2) # the precision limits the precision of the decimal points of the bins to two digits
+```
+
+A closely related function is `pd.qcut()`, which 
+will separate the data in equally populated quantiles:
+
+```python
+data = np.random.standard_normal(size=1000)
+quartiles = pd.qcut(data, 4, precision=2)
+quartiles
+```
+
+```python
+quartiles.value_counts()
+```
+
+We can also pass our own intervals for the quantiles,
+as long as they are number between 0 and 1, inclusive:
+
+```python
+pd.qcut(data, [0, 0.1, 0.5, 0.7, 1]).value_counts()
+```
+
+### Detecting and Filtering Outliers
+
+Filtering or transforming outliers is usually a matter
+of applying array operations. Consider this DataFrame
+with some normally distributed data:
+
+```python
+data = pd.DataFrame(np.random.standard_normal((1000, 4)))
+data.describe()
+```
+
+Suppose we want to find all values in a given column
+with absolute value > 3:
+
+```python
+col = data[2]
+col[col.abs() >3]
+```
+
+To find all rows with any absolute value bigger than
+three, we can use the `any` method on a Boolean DataFrame:
+
+```python
+data[(data.abs()>3).any(axis='columns')]
+```
+
+We can use the boolean indexing of `data.abs() > 3`
+to set a new value, for example, 3 or -3. Here, 
+we'll use the `np.sign()` method to determine the 
+sign of the data, and therefore if it should have
+3 or -3 attributed:
+
+```python
+data[data.abs() > 3] = np.sign(data) * 3
+data.describe()
+```
+
+### Permutation and Random Sampling
+
+So, there's this numpy method that returns a permutation
+the size we give it in the parameter:
+
+```python
+sampler = np.random.permutation(5)
+sampler
+```
+
+We can use this with `iloc[]` to return a random sample
+of rows. We can also use it with the `take()` method,
+that accepts an `axis` argument to sample columns as well.
+
+```python
+df = pd.DataFrame(np.arange(5*7).reshape(5, 7))
+df
+```
+
+```python
+df.iloc[sampler]
+```
+
+```python
+df.take(sampler, axis=1)
+```
+
+Alternatively, there's the `sample()` df method,
+which also allows for `replace=True` parameter
+to allow for replacements:
+
+```python
+df.sample(n=3, axis=1, replace=True)
+```
+
+### Computing Indicator/Dummy Variables
+
+A dummy or indicator matrix is a matrix indicating
+if a value belongs to a certain category or not.
+Take the example:
+
+```python
+df = pd.DataFrame({"key": ["b", "b", "a", "c", "a", "b"], "data1": range(6)})
+df
+```
+
+```python
+pd.get_dummies(df['key'])
+```
+
+We can also add a prefix to our dummy columns
+to make it easier to join them to the original 
+DataFrame later:
+
+```python
+pd.get_dummies(df['key'], prefix='key')
+```
+
+If a row in a dataframe belongs to multiple categories,
+we'll have to use a different approach to create the 
+dummies, using the `str.get_dummies(<separator>)` method:
+
+```python
+mnames = ['movie_id', 'title', 'genres']
+movies = pd.read_table('../pydata-book/datasets/movielens/movies.dat', sep='::', 
+                       header=None, names=mnames, engine='python')
+movies[:10]
+```
+
+```python
+dummies = movies['genres'].str.get_dummies('|')
+dummies.iloc[:10, :6]
+```
+
+Then we could add a prefix with the `add_prefix()` method:
+
+```python
+dummies.add_prefix('genre_')
+```
+
+A useful statistical application is to use `get_dummies()` with
+binning to create a matrix indicating belonging to a certain bin:
+
+```python
+np.random.seed(12345)
+values=np.random.uniform(size=10)
+values
+```
+
+```python
+bins = [0, 0.2, 0.4, 0.6, 0.8, 1]
+pd.get_dummies(pd.cut(values, bins))
+```
+
+### Summary
+
+We've learned plenty of data transformation techniques:
+
+- Removing and checking for duplicates with `duplicated()` and `drop_duplicates()`
+- Transforming data with `.map` and a function or dictionary-like object;
+- Replacing values with `replace()` and lists of values or dict-like objects;
+- Renaming Axis Indexes with `rename()` and `index=`, `column=` parameters;
+- Discretization and Binning with `pd.cut` and `pd.qcut()`, accepting different quantiles;
+- Detecting and Filtering outliers with assigning with boolean arrays and `np.sign(data)`;
+- Permutation and Random Sampling with `np.random.permutation(n)` and `iloc[]` or `take()`,
+plus `df.sample(n, axis, replace)`;
+- Computing dummies and indicators with `pd.get_dummies(col)` and `df[col].str.get_dummies(sep)`
+- Combining dummies with binnings with `pd.get_dumies(pd.cut(values, bins))`;
