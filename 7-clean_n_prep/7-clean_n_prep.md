@@ -13,6 +13,12 @@ jupyter:
 
 # 7 - Data Cleaning and Preparation
 
+## Initial Imports
+
+```python
+import pandas as pd
+import numpy as np
+```
 In this chapter we discuss tools for handling missing data,
 duplicate data, string manipulation, and some other analytical
 data transformations. The next chapter is then focused on 
@@ -550,3 +556,475 @@ We've learned plenty of data transformation techniques:
 plus `df.sample(n, axis, replace)`;
 - Computing dummies and indicators with `pd.get_dummies(col)` and `df[col].str.get_dummies(sep)`
 - Combining dummies with binnings with `pd.get_dumies(pd.cut(values, bins))`;
+
+## 7.3 Extension Data Types
+
+Consider the following integer array:
+
+```python
+s = pd.Series([1, 4, 2, None])
+s
+```
+
+The float64 type comes from the fact that pandas
+uses `np.nan` as a NA sentinel. We can force another
+dtype by using the `dtype` parameter in the series 
+creation:
+
+```python
+s = pd.Series([1, 4, 2, None], dtype=pd.Int64Dtype())
+s
+```
+
+This uses the sentinel value `pd.NA`:
+
+```python
+s[3] is pd.NA
+```
+
+We can also declare the type with a shorter string:
+
+```python
+s = pd.Series([1, 4, 2, None], dtype='Int64')
+s
+```
+
+There is also a `StringDType`, but it requires the 
+pyarrow library:
+
+```python
+s = pd.Series(['one', 'two', None, 'three'], dtype=pd.StringDtype())
+s
+```
+
+We can convert dtypes with the `astype()` method
+as part of the data cleaning process:
+
+```python
+df = pd.DataFrame({"A": [1, 2, None, 4], "B": ["one", "two", "three", None], "C": [False, None, False, True]})
+df
+```
+
+```python
+df['A'] = df['A'].astype('Int64')
+df['B'] = df['B'].astype('string')
+df['C'] = df['C'].astype('boolean')
+df
+```
+
+## 7.4 String Manipulation
+
+We use built-in string methods along with regular
+expressions for string manipulation, as python's 
+built-in methods are sufficient for a variety of tasks:
+
+### Python Built-in String Object Methods
+
+We can split using a delimiter:
+
+```python
+val = 'a,b,     guido'
+val.split(',')
+```
+
+We can combine that with `trim()` for removing whitespaces:
+
+```python
+pieces = [x.strip() for x in val.split(',')]
+pieces
+```
+
+We can concat these strings with another delimiter
+using the `.join()` method:
+
+```python
+'::'.join(pieces)
+```
+
+We can locate substrings with the `in` keyword and the
+`index()` and `find()` methods:
+
+```python
+'gui' in val
+```
+
+```python
+val.index('gui')
+```
+
+```python
+val.find('mel')
+```
+
+We can count substrings:
+
+```python
+val.count(',')
+```
+
+And replace them too:
+
+```python
+val.replace(',', '::')
+```
+
+Replace can be used to remove occurrences too:
+
+```python
+val.replace(',', '')
+```
+
+### Regular Expressions
+
+Regular expressions are a dense topic, but here
+what's important is that they allow us to find
+complex patterns within strings and string datasets.
+
+To use regex, we import the `re` library:
+
+```python
+import re
+```
+
+```python
+text = 'foo       bar\t baz     \tqux'
+re.split(r'\s+', text)
+```
+
+Here, we split using any number of whitespaces with
+the `\s+` regex. When we call this expression, it is
+first compiled and then applies. We can compile the 
+regex first with `re.compile`, which is better suited
+for repeated use of the regex:
+
+```python
+regex = re.compile(r'\s+')
+regex.split(text)
+```
+
+To instead of splitting, **find all occurrences** of 
+a pattern, we can use `.findall()` regex method:
+
+```python
+regex.findall(text)
+```
+
+`search()` and `match()` are closely related to `findall`,
+but search only returns the first match and match 
+only matches at the beginning of the string. Consider the following 
+block of text and regex pattern:
+
+```python
+text = """Dave dave@google.com 
+Steve steve@gmail.com 
+Rob rob@gmail.com 
+Ryan ryan@yahoo.com"""
+pattern = r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}"
+
+regex = re.compile(pattern, flags=re.IGNORECASE)
+```
+
+re.IGNORECASE makes the regex ignore case sensitivity.
+
+Using `findall` here produces a list of emails:
+
+```python
+regex.findall(text)
+```
+
+Search will return a special object for the first 
+email found:
+
+```python
+m = regex.search(text)
+m
+```
+
+```python
+text[m.start():m.end()]
+```
+
+Match won't return anything, as the pattern isn't 
+found in the beginning of the string:
+
+```python
+print(regex.match(text))
+```
+
+The `sub` method substitutes the pattern everywhere
+it is found:
+
+```python
+print(regex.sub('REDACTED', text))
+```
+
+If we want the resulting pattern to be return in separate
+parts, as in parts of a tuple, we can add parenthesis to 
+each pattern part: 
+
+```python
+pattern = r"([A-Z0-9._%+-]+)@([A-Z0-9.-]+)\.([A-Z]{2,4})"
+regex = re.compile(pattern, flags=re.IGNORECASE)
+```
+
+A match object will be split with this in its `groups()` method:
+
+```python
+m = regex.match('fake_email43@gmail.com')
+m.groups()
+```
+
+`findall()` returns a list of tuples:
+
+```python
+regex.findall(text)
+```
+
+The `sub()` method also has access to each of the values
+in the groups created. `\1` refers to the first value, `\2`
+to the second, and so on and so forth:
+
+```python
+print(regex.sub(r'Username: \1, domain: \2, Suffix: \3', text))
+```
+
+### String Functions in pandas
+
+Pandas has specialized string functions for dealing with
+data in this format. Consider this list of emails in a 
+series:
+
+```python
+data = {"Dave": "dave@google.com", "Steve": "steve@gmail.com", "Rob": "rob@gmail.com", "Wes": np.nan}
+data = pd.Series(data)
+data
+```
+
+The fact that this data has missing values makes using 
+map methods and functions harder. Hence, string methods
+such as contains:
+
+```python
+data.str.contains('gmail')
+```
+
+To make correct typing of this Series, we may use the
+extension type concept learned earlier:
+
+```python
+data_str = data.astype('string')
+data_str.str.contains('gmail')
+```
+
+Regular expressions can also be use, along with many
+`re` options such as `IGNORECASE`:
+
+```python
+pattern = r"([A-Z0-9._%+-]+)@([A-Z0-9.-]+)\.([A-Z]{2,4})"
+data.str.findall(pattern, flags=re.IGNORECASE)
+```
+
+We can use both indexing or `.get` method to retrieve
+from this:
+
+```python
+matches = data.str.findall(pattern, flags=re.IGNORECASE).str[0]
+matches
+```
+
+```python
+matches.str.get(1)
+```
+
+We can also slice with this syntax:
+
+```python
+data.str[:5]
+```
+
+The `extract()` method returns the groups of a 
+regex as a DataFrame:
+
+```python
+data.str.extract(pattern, flags=re.IGNORECASE)
+```
+
+This part of the book presents a table with a list of 
+useful string methods. Refer to it in page 235 or in
+Pandas documentation.
+
+## 7.5 Categorical Data
+
+When using categorical methods, we store the values
+not as their strings, but as integer-coding and 
+category-corresponding pairs. This makes calculations
+and storage more efficient. Consider the following 
+example: 
+
+```python
+fruits = ['apple', 'orange', 'apple', 'apple'] * 2
+
+N = len(fruits)
+
+rng = np.random.default_rng(seed=12345)
+
+df = pd.DataFrame({'fruit': fruits,
+                   'basket_id': np.arange(N),
+                   'count':rng.integers(3, 15, size=N),
+                   'weight': rng.uniform(0,4, size=N)},
+                   columns=['basket_id', 'fruit', 'count', 'weight'])
+df
+```
+
+Here, `df['fruit']` is an array of strings with quite
+some repetition. We could convert it to categorical by 
+calling:
+
+```python
+fruit_cat = df['fruit'].astype('category')
+fruit_cat
+```
+
+The values for `fruit_cat` are now an instance of 
+`pd.Categorical`, which can be accessed by the 
+`.array` attribute:
+
+```python
+c = fruit_cat.array
+type(c)
+```
+
+It has `codes` and `categories` attributes:
+
+```python
+fruit_cat.array.codes
+```
+
+```python
+c.categories
+```
+
+To get a mapping between codes and categories, we can
+use this trick:
+
+```python
+dict(enumerate(c.categories)) # enumerate returns tuples with indices and values
+```
+
+To convert a DataFrame column to categorical, just assign the 
+result to it:
+
+```python
+df['fruit'] = df['fruit'].astype('category')
+df['fruit']
+```
+
+We can also create a `pandas.Categorical` from 
+other sequences:
+
+```python
+my_categories = pd.Categorical(['foo', 'bar', 'baz', 'foo', 'bar'])
+my_categories
+```
+
+If we've obtained the categories encoded from another 
+source, we can use the `.from_codes` constructor:
+
+```python
+categories = ['foo', 'bar', 'baz']
+codes = [0, 1, 2, 0, 0, 1]
+my_cats_2 = pd.Categorical.from_codes(codes, categories)
+my_cats_2
+```
+
+Regarding **ordered** categorical data (ordinal), we
+may explicitly say the data is ordered when constructing,
+or convert it to ordered:
+
+```python
+ordered_cat = pd.Categorical.from_codes(codes, categories, ordered=True)
+ordered_cat
+```
+
+```python
+my_cats_2.as_ordered()
+```
+
+As a last note, any Immutable data type can be made
+into Categorical, not just strings.
+
+### Computations with Categoricals
+
+Categoricals are better optimized for functions
+like `groupby` and `agg`, which are routinely
+used in data analysis. Also, they use less 
+memory than their non-categorical counterparts.
+
+As an example of performance, consider a `value_counts()`
+of this 10 million dataset, as well as its memory usage:
+
+```python
+N = 10_000_000
+labels = pd.Series(['foo', 'bar', 'baz', 'qux'] * (N//4))
+```
+
+```python
+categories = labels.astype('category')
+```
+
+```python
+lab_m = labels.memory_usage(deep=True)
+```
+
+```python
+cat_m = categories.memory_usage(deep=True)
+```
+
+```python
+cat_m/lab_m
+```
+
+```python
+%timeit labels.value_counts()
+```
+
+```python
+%timeit categories.value_counts()
+```
+
+### Categorical Methods
+
+Categories have special `.cat.methods()` as well, 
+specially but not limited to:
+
+- `set_categories()`
+- `remove_unused_categories()`
+
+Finally, it is important to remember that we can transform
+categories into *dummy variables* with the `pd.get_dummies()`
+method, which will come in handy for preparing data for 
+machine learning algorithms.
+
+## Summary (7.3 onwards:)
+
+Today we've learned:
+
+- To load and transform pandas data with missing values with `dtype=` and `astype()`
+- To set up regex with `re(pattern)`, to compile them, to look for patterns to:
+    - `split()` at pattern; 
+    - `findall()` instances of pattern;
+    - `search()` for first occurrence of pattern;
+    - `match()` at string start; 
+    - Return the result of `findall()` in multiple parts by wrapping the pattern in parenthesis;
+    - To sub each piece of the pattern with `\1', \2`...
+- To use pandas `str` functions to work with string data, such as:
+    - `contains()`;
+    - `findall(regex, flags)`;
+    - `slice` with `str[:n]`
+    - create groups from regex findall pieces with `str.extract(pattern)`
+- To turn columns into `pandas.Categorical` for performance;
+- To get the categories-codes with `dict(enumerate(df[column].array.categories))`
+- To create ordered categoricals from constructor `ordered=True` or conversion `.as_ordered()`
+- Some categorical methods such as `cat.set_categories` and `cat.remove_unused_categories`
+
+
