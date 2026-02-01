@@ -465,6 +465,65 @@ values = pd.Series(np.concatenate([comp1, comp2]))
 sns.histplot(values, bins=100, kde=True)
 ```
 
+### Scatter of Point Plots
+
+Seaborn makes scatterplots more complete with the `regplot()`
+method, which makes a scatter plot alongside a linear regression
+line for the plot, with intervals and what not:
+
+```python
+macro = pd.read_csv('../pydata-book/examples/macrodata.csv')
+
+data = macro[['cpi', 'm1', 'tbilrate', 'unemp']]
+
+trans_data = np.log(data).diff().dropna()
+
+trans_data.tail()
+```
+
+```python
+sns.set_style('whitegrid')
+sns.regplot(x = 'm1', y='unemp', data=trans_data)
+```
+
+In EDA, it is helpful to be able to look at all the 
+scatterplots among a group of variables in a matrix
+sort of way. `seaborn` makes it possible with `pairplot`:
+
+```python
+sns.pairplot(trans_data, diag_kind='kde', plot_kws={'alpha': 0.2})
+```
+
+The `plot_kws` arguments allows us to pass configurations
+to the styling of the off-diagonal elements
+
+### Facet Grids and Categorical Data
+
+If our data has multiple category columns, it may be useful
+to see how data differs for each category. Seaborn has `catplo()`,
+with various different ways to visualize plot split by categories:
+
+```python
+sns.catplot(x='day', y='tip_pct', hue='time', col='smoker', kind='bar',
+            data=tips[tips.tip_pct < 1])
+```
+
+Instead of using time in the `hue`, which creates another bar,
+we could split it in a grid with `row`:
+
+```python
+sns.catplot(x='day', y='tip_pct', col='smoker', row='time',
+            kind='bar', data=tips[tips.tip_pct < 1])
+```
+
+Other `kind` of plots supported by catplot are `'box'`, 
+maybe `'vioin'`, and others!:
+
+```python
+sns.catplot(x='day', y='tip_pct', kind='violin',
+            col='smoker', row='time', data=tips[tips.tip_pct < 0.5])
+
+```
 ## Summary
 
 - matplotlib API basics:
@@ -485,3 +544,6 @@ sns.histplot(values, bins=100, kde=True)
     - Seaborn `sns.barplot()` receives `data=` and `x`, `y` columns for plotting, as well as `orient` and `hue`
     - For histograms and density plots, pandas objects have `plot.hist(bins=n)` and `plot.density()`.
     - Seaborn has `sns.histplot(data, bins=, kde=False)` to plot hist and density simultaneously
+    - Seaborn scatterplots can be done with `regplot(x, y, data)` giving us regression lines as well
+    - Scatterplot grids can be done with `pairplot(data, diag_kind='kde')`
+    - Categorical plots can be made with `catplot(x, y, kind=<box, bar, violin>, row, col)`
