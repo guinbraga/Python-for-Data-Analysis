@@ -20,6 +20,7 @@ from matplotlib.lines import lineStyles
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import seaborn as sns
 # Increase default figure size (width, height in inches)
 plt.rcParams['figure.figsize'] = [12, 8] 
 # Increase DPI (dots per inch) for sharper, larger images on high-res screens
@@ -279,6 +280,7 @@ ax.add_patch(rect)
 ax.add_patch(circ) 
 ax.add_patch(pgon)
 ```
+
 ### Saving Plots to a File
 
 We can save figures to a file with `fig.savefig('file.ext')`
@@ -287,3 +289,199 @@ SVG, PNG, PDF... We can specify a dpi with `dpi` argument.
 
 The `facecolor`, `edgecolor` parameters define the color for
 the background and edges of the plots.
+
+## 9.2 Plotting with pandas and seaborn
+
+Pandas has some tools for plotting built on top of `matplotlib`
+to make plotting from various columns of data easier. We'll also
+explore the `seaborn` package, which is also built on top of 
+matplotlib.
+
+### Line Plots
+
+Series and DataFrames have a `plot()` method for making plots.
+By default, they make a line plot:
+
+```python
+s = pd.Series(np.random.standard_normal(10).cumsum(), index=np.arange(0, 100, 10))
+s.plot(title="first pandas plot", grid=True, xlim=[0, 90], xticks=range(0, 91, 10))
+```
+
+We can set many parameters with the same name they had in
+`matplotlib`, but now inside the `plot()` method.
+
+DataFrame's plot method plots each column as a different line,
+setting a legend automatically.
+
+```python
+df = pd.DataFrame(np.random.standard_normal((10, 4)).cumsum(0),
+                  columns=['A', 'B', 'C', 'D'],
+                  index=np.arange(0, 100, 10))
+df.plot(title='My first DataFrame plot', grid=True, xticks=range(0, 91, 10),
+        xlim=[0, 90])
+```
+
+Some DataFrame plot specific parameters are `subplots=True`
+for plotting the columns on different subplots, `sharex` and
+`sharey` for such case, `legend` (true by default), `sort_columns`.
+
+The `plot()` method contains more methods for different
+plot types. `plot()` is equivalent to `plot().line()`
+We'll see some of these child methods ahead:
+
+### Bar Plots
+
+`plot.bar()` and `plot.barh()` make vertical and horizontal bar 
+plots. The Series or DF index is used as x (bar) or y (barh) ticks.
+
+```python
+fig, axes = plt.subplots(1, 2)
+data = pd.Series(np.random.uniform(size=16), index=list('abcdefghijklmnop'))
+
+data.plot.bar(ax=axes[0], color='black', alpha=0.7)
+
+data.plot.barh(ax=axes[1], color='black', alpha=0.7)
+```
+
+What about DataFrames?
+
+```python
+df = pd.DataFrame(np.random.uniform(size=(6,4)),
+                  index=pd.Index(['one', 'two', 'three', 'four', 'five', 'six'], name='index'),
+                  columns=pd.Index(['A', 'B', 'C', 'D'], name='Genus'))
+df
+```
+
+```python
+df.plot.bar()
+```
+
+The column and index names are used as labels for the
+legend and xlabel, respectively.
+
+We can create **stacked bar plots** by passing `stacked=True`:
+
+```python
+df.plot.barh(stacked=True, alpha=0.5)
+```
+
+A useful recipe for visualizing a Series `value_counts()` is
+`s.value_counts().plot.bar()`
+
+Let's do some visualization with a dataset about restaurant 
+tipping. First, we'll try to visualize the percentage of 
+party size for each day of the week. Let's start by loading
+the dataset and preparing it:
+
+```python
+tips = pd.read_csv('../pydata-book/examples/tips.csv')
+tips.head()
+```
+
+```python
+party_size = pd.crosstab(tips['day'], tips['size'])
+party_size = party_size.reindex(['Thur', 'Fri', 'Sat', 'Sun'])
+party_size
+```
+
+Since there's almost no 1 and 6 sized parties, we'll remove them:
+
+```python
+party_size = party_size.loc[:, 2:5]
+```
+
+Then we'll normalize by dividing each value by the sum across
+the index:
+
+```python
+party_size = party_size.div(party_size.sum(axis=1), axis=0)
+party_size.plot.bar(stacked=True)
+```
+Seaborn can make data visualization requiring aggregation
+or summarization much simpler. Lets visualize tipping percentage
+by day of the week:
+
+```python
+tips['tip_pct'] = tips['tip']/(tips['total_bill'] - tips['tip'])
+tips.head()
+```
+
+```python
+import seaborn as sns
+sns.barplot(x='tip_pct', y='day', data=tips, orient='h')
+```
+
+Here the black lines represent 95 confidence intervals. 
+Seaborn plots take a `data=` argument, which can be a pandas
+object, and column names for x and y coordinates.
+
+Because there are multiple observations for each day, the value 
+presented is the average value. This can be configured by
+arguments of the plotting function.
+
+There's a hue option that allows us to split by a second 
+category:
+
+```python
+sns.barplot(x='tip_pct', y='day', hue='time', data=tips, orient='h')
+```
+
+Seaborn has taken care of most of the styling automatically,
+but we can swap between different themes with `set_style`
+
+```python
+sns.set_style('whitegrid')
+
+sns.barplot(x='tip_pct', y='day', hue='time', data=tips, orient='h')
+```
+
+### Histogram and Density Plots
+
+A histogram can be made with `plot.hist()`. In it, we can specify 
+the number of bins of the data. Making a histogram of the `tips_pct`:
+
+```python
+tips['tip_pct'].plot.hist(bins=50)
+```
+
+A density plot tries to estimate continuous probability distribution
+of the data, usually using distributions such as the normal.
+We can plot density distribution with `plot.density()`:
+
+```python
+tips['tip_pct'].plot.density()
+```
+
+Seaborn allows us to make simultaneous density and histogram plots.
+Consider this bimodal example from two normal distributions:
+
+```python
+comp1 = np.random.standard_normal(200)
+
+comp2 = 10 + 2*np.random.standard_normal(200)
+
+values = pd.Series(np.concatenate([comp1, comp2]))
+
+sns.histplot(values, bins=100, kde=True)
+```
+
+## Summary
+
+- matplotlib API basics:
+    - the starting frame is a `figure(n, m)`, which has n rows and m columns for plotting.
+    - AxesSubplot objects are created with `fig.add_subplot(n, m, i)`
+    - in Axes we create plots such as `hist(data, bins)`, `scatter(data, data)`
+    - We adjust space between plots with `fig.subplots_adjust(wspace, hspace)`
+    - subplots can `sharex`, `sharey`
+    - We can set `color`, `linestyle`, `drawstyle`, `marker`
+    - We can `set_xticks`, `set_xticklabels`, as well as `rotation`, `fontsize`, `fontweight` 
+    - We can `.annotate(label, xy, arrowprops)` on the plot, as well as draw with `patches` and `add_patches`
+    - We can `fig.savefig('file.ext')`
+- Pandas and Seaborn increments:
+    - pandas objects have a `plot()` method, that defaults to line plots 
+    - on dataframes, `plot(subplots=True)` makes columns be different plots
+    - `plots` has children, such as `plot.bar()` and `barh()`
+    - The plots can be done on Axes objects with `ax=` parameter
+    - Seaborn `sns.barplot()` receives `data=` and `x`, `y` columns for plotting, as well as `orient` and `hue`
+    - For histograms and density plots, pandas objects have `plot.hist(bins=n)` and `plot.density()`.
+    - Seaborn has `sns.histplot(data, bins=, kde=False)` to plot hist and density simultaneously
