@@ -669,3 +669,83 @@ by_year.apply(regress, yvar='AAPL', xvars=['SPX'])
 - We can fill with different values for different groups by defining a function that uses a dict mapping
 - We can sample by group and return the values sampled, as `apply` will concatenate them;
 - We can compute statistics across different columns, all we need is to write the function
+
+## 10.4 Group Transforms and "Unwrapped" GroupBys
+
+Transforms are a more constrained version of `apply`.
+They return objects of the same shape of the input, 
+and do not alter the input. Here's an example:
+
+```python
+n = 100002
+df = pd.DataFrame({'keys': ['a','b','c'] * int(n/3),
+                   'values': np.arange(n)})
+df
+```
+
+Suppose we want to create a new array with the
+same size of this one, but with the `mean()` of
+each group. We can do that with `transform()`:
+
+```python
+def get_mean(group):
+  return group.mean()
+
+by_key = df.groupby('keys')
+by_key.transform(get_mean)
+```
+
+For built-in aggregation, we can use the function
+name:
+
+```python
+by_key.transform('median')
+```
+
+For a more complex example, we can create the rank
+of each value within it's group in descending order:
+
+```python
+def get_rank(group):
+  return group.rank(ascending=False)
+
+by_key.transform(get_rank)
+```
+
+Consider this normalize function:
+
+```python
+def normalize(x):
+  return (x-x.mean())/x.std()
+
+by_key.transform(normalize)
+```
+
+```python
+%%timeit
+by_key.transform(normalize)
+```
+
+```python
+%%timeit
+by_key.apply(normalize)
+```
+
+```python
+df = df.reset_index(drop=True)
+```
+
+```python
+%%timeit
+(df['values'] - by_key['values'].transform('mean')) / by_key['values'].transform('std')
+```
+
+In general, although the syntax is more convoluted, it
+is more efficient to do arithmetic between different
+groupby operation outputs than to apply the functions 
+to each value using `apply` or `transform`.
+
+### Summary:
+
+- `groupby.transform(func)` returns a pandas object of the same shape
+- `arithmetic` between groupbys outputs is more efficient than `applying` or `transforming` each element. 
