@@ -749,3 +749,32 @@ to each value using `apply` or `transform`.
 
 - `groupby.transform(func)` returns a pandas object of the same shape
 - `arithmetic` between groupbys outputs is more efficient than `applying` or `transforming` each element. 
+
+## 10.5 Pivot Tables and Cross-Tabulation
+
+.
+
+### Pivot Tables
+
+Pivot tables are a top-level `pd.pivot_table` function
+and dataframe method for creating tables of aggregations
+for comparing aggvalues between different groups. Take the
+tips dataset as example:
+
+```python
+tips.pivot_table(index=['time', 'smoker'], columns='day',
+                 values=['tip_pct', 'total_bill'], aggfunc='sum', margins=True)
+```
+
+```python
+tips.pivot_table(index=['time', 'smoker'], columns='day',
+                 values=['tip_pct', 'total_bill'], aggfunc='sum', 
+                 fill_value=0, margins=True, margins_name='Total')
+```
+
+As demonstrated, we can also use fill_values.
+
+### Cross-Tabulations: Crosstab
+
+`pd.crosstab(index, column)` creates a crosstab similar
+to `pivot_table`, with counts as default `aggfunc`.
